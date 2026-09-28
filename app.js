@@ -3,11 +3,11 @@ const supportedLanguages = ["fr", "en", "ar", "it", "es", "de"];
 const supabaseConfig = window.CLAIR_SUPABASE_CONFIG;
 const supabaseLibrary = window.supabase;
 const languageKey = "clair-language";
-const rarityKeys = {
-  common: "common",
-  rare: "rare",
-  epic: "epic",
-  legendary: "legendary",
+const rarityFallbackColors = {
+  common: "#7edac0",
+  rare: "#79b9ff",
+  epic: "#d698ff",
+  legendary: "#ffd27c",
 };
 
 const supabaseClient = supabaseConfig?.url && supabaseConfig?.anonKey && supabaseLibrary?.createClient
@@ -16,7 +16,9 @@ const supabaseClient = supabaseConfig?.url && supabaseConfig?.anonKey && supabas
 
 let language = "fr";
 let currentUser = null;
-let catalog = [];
+let animeSeries = [];
+let rarityLevels = [];
+let characterCards = [];
 let collection = [];
 let packs = [];
 let activePanel = "collection";
@@ -24,12 +26,17 @@ let activeAnimeFilter = "";
 let accountInitialized = false;
 let dataReady = false;
 let dataError = "";
+let isOwner = false;
 let authMode = "signin";
 let loadingPack = false;
+let editingAnimeId = "";
+let editingCardId = "";
+let editingRarityId = "";
 let toastTimer;
 
 const authDialog = document.querySelector("#auth-dialog");
 const revealDialog = document.querySelector("#reveal-dialog");
+const openingDialog = document.querySelector("#opening-dialog");
 const toast = document.querySelector("#toast");
 
 function t(key, values = {}) {
@@ -67,7 +74,7 @@ function applyTranslations() {
     if (element.id === "auth-title") {
       element.textContent = currentUser
         ? currentUser.user_metadata?.username || currentUser.email
-        : t(authMode === "signin" ? "signIn" : "createAccount");
+        : t(authMode === "signup" ? "createAccount" : "signIn");
     } else {
       element.textContent = translation;
     }
@@ -93,30 +100,51 @@ function setLanguage(nextLanguage) {
   applyTranslations();
 }
 
+function safeColor(value, fallback = "#b496ff") {
+  return /^#[0-9a-f]{6}$/i.test(value || "") ? value : fallback;
+}
+
 function cardArt(card) {
   const image = card.image_url
     ? `<img src="${escapeHtml(card.image_url)}" alt="${escapeHtml(card.character_name)}" loading="lazy" referrerpolicy="no-referrer">`
     : "";
   const initials = card.character_name.trim().slice(0, 1).toLocaleUpperCase(language);
-  return `<div class="character-art rarity-${escapeHtml(card.rarity)}"><span class="card-art-glow"></span><span class="card-initial">${escapeHtml(initials || "✦")}</span>${image}<span class="card-art-symbol" aria-hidden="true">✦</span></div>`;
+  return `<div class="character-art"><span class="card-art-glow"></span><span class="card-initial">${escapeHtml(initials || "✦")}</span>${image}<span class="card-art-symbol" aria-hidden="true">✦</span></div>`;
 }
 
-function cardMarkup(card, duplicateCount = 1) {
+function cardMarkup(card, duplicateCount = 1, revealIndex = -1) {
   const copies = duplicateCount > 1
     ? `<span class="copy-count">×${duplicateCount}</span>`
     : "";
-  return `<article class="character-card rarity-${escapeHtml(card.rarity)}">${cardArt(card)}<div class="character-card-copy"><p class="character-anime">${escapeHtml(card.anime_name)}</p><h3>${escapeHtml(card.character_name)}</h3><span class="rarity-label">${escapeHtml(t(rarityKeys[card.rarity] || "common"))}</span></div>${copies}</article>`;
+  const accent = safeColor(card.rarity_color, rarityFallbackColors[card.rarity] || "#b496ff");
+  const details = [
+    card.anime_name ? `<span>${escapeHtml(card.anime_name)}</span>` : "",
+    card.manga_artist ? `<span>${escapeHtml(t("mangaka"))} · ${escapeHtml(card.manga_artist)}</span>` : "",
+    card.description ? `<p>${escapeHtml(card.description)}</p>` : `<p>${escapeHtml(t("noCharacterNote"))}</p>`,
+    `<span class="details-hint">${escapeHtml(t("tapCardDetails"))}</span>`,
+  ].filter(Boolean).join("");
+  return `<article class="character-card${revealIndex >= 0 ? " reveal-card" : ""}" style="--card-accent:${accent}" role="button" tabindex="0" aria-expanded="false" aria-label="${escapeHtml(t("cardFor", { name: card.character_name }))}"><div class="character-card-front" aria-hidden="false">${cardArt(card)}<div class="character-card-copy"><p class="character-anime">${escapeHtml(card.anime_name)}</p><h3>${escapeHtml(card.character_name)}</h3><span class="rarity-label">${escapeHtml(card.rarity_name || card.rarity || t("common"))}</span></div>${copies}</div><div class="character-card-details" aria-hidden="true"><strong>${escapeHtml(card.character_name)}</strong>${details}</div></article>`;
 }
 
 function attachImageFallbacks(container) {
-  container.querySelectorAll(".character-art img, .catalog-row-art img").forEach((image) => {
+  container.querySelectorAll(".character-art img, .anime-record-image img").forEach((image) => {
     image.addEventListener("error", () => image.remove(), { once: true });
   });
 }
 
-function uniqueAnimeNames() {
-  return [...new Set(catalog.map((card) => card.anime_name))]
-    .sort((first, second) => first.localeCompare(second, language));
+function toggleCardDetails(card) {
+  if (!card) return;
+  const expanded = card.classList.toggle("card-flipped");
+  card.setAttribute("aria-expanded", String(expanded));
+  card.querySelector(".character-card-front").setAttribute("aria-hidden", String(expanded));
+  card.querySelector(".character-card-details").setAttribute("aria-hidden", String(!expanded));
+}
+
+function activeAnimesForPacks() {
+  const availableIds = new Set(characterCards
+    .filter((card) => card.is_active && card.rarity?.is_active)
+    .map((card) => card.anime_id));
+  return animeSeries.filter((anime) => anime.is_active && availableIds.has(anime.id));
 }
 
 function renderCollection() {
@@ -132,14 +160,12 @@ function renderCollection() {
       return `<button type="button" class="filter-chip${activeAnimeFilter === anime ? " selected" : ""}" data-anime-filter="${escapeHtml(anime)}">${escapeHtml(anime)}<span>${count}</span></button>`;
     }),
   ].join("");
-
   const filtered = collection.filter((entry) => {
     const card = entry.card_data;
     const matchesAnime = !activeAnimeFilter || card.anime_name === activeAnimeFilter;
-    const matchesSearch = !search
-      || card.character_name.toLocaleLowerCase(language).includes(search)
-      || card.anime_name.toLocaleLowerCase(language).includes(search);
-    return matchesAnime && matchesSearch;
+    const searchable = [card.character_name, card.anime_name, card.manga_artist, card.rarity_name]
+      .join(" ").toLocaleLowerCase(language);
+    return matchesAnime && (!search || searchable.includes(search));
   });
   const duplicates = new Map();
   collection.forEach((entry) => {
@@ -147,9 +173,9 @@ function renderCollection() {
     duplicates.set(key, (duplicates.get(key) || 0) + 1);
   });
   const grid = document.querySelector("#collection-grid");
-  grid.innerHTML = filtered.map((entry) => {
+  grid.innerHTML = filtered.map((entry, index) => {
     const key = `${entry.card_data.anime_name}\u0000${entry.card_data.character_name}`;
-    return cardMarkup(entry.card_data, duplicates.get(key));
+    return cardMarkup(entry.card_data, duplicates.get(key), index);
   }).join("");
   attachImageFallbacks(grid);
   document.querySelector("#collection-count").textContent = collection.length.toLocaleString(language);
@@ -165,33 +191,88 @@ function renderCollection() {
   }
 }
 
-function renderCatalog() {
-  const grid = document.querySelector("#catalog-list");
-  const countLabel = document.querySelector("#catalog-count");
-  countLabel.textContent = catalog.length.toLocaleString(language);
-  grid.innerHTML = catalog.map((card) => `
-    <article class="catalog-row">
-      <div class="catalog-row-art rarity-${escapeHtml(card.rarity)}">
-        ${card.image_url ? `<img src="${escapeHtml(card.image_url)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : `<span>${escapeHtml(card.character_name.slice(0, 1).toLocaleUpperCase(language))}</span>`}
-      </div>
-      <div class="catalog-row-copy"><strong>${escapeHtml(card.character_name)}</strong><span>${escapeHtml(card.anime_name)}</span></div>
-      <span class="rarity-label">${escapeHtml(t(rarityKeys[card.rarity] || "common"))}</span>
-      <button class="icon-action delete-catalog-card" type="button" data-card-id="${escapeHtml(card.id)}" aria-label="${escapeHtml(t("removeCharacter", { name: card.character_name }))}" title="${escapeHtml(t("removeCharacter", { name: card.character_name }))}">×</button>
-    </article>`).join("");
-  attachImageFallbacks(grid);
-  document.querySelector("#catalog-empty").hidden = catalog.length > 0;
-  grid.hidden = catalog.length === 0;
-
-  const animeSelect = document.querySelector("#anime-select");
-  const previous = animeSelect.value;
-  const animeNames = uniqueAnimeNames();
-  animeSelect.innerHTML = animeNames.length
-    ? animeNames.map((anime) => `<option value="${escapeHtml(anime)}">${escapeHtml(anime)}</option>`).join("")
-    : `<option value="" disabled>${escapeHtml(t("noAnime"))}</option>`;
-  if (animeNames.includes(previous)) animeSelect.value = previous;
+function fillSelect(select, items, placeholder, selectedValue = "") {
+  select.innerHTML = `<option value="">${escapeHtml(placeholder)}</option>${items.map((item) => (
+    `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`
+  )).join("")}`;
+  if (items.some((item) => item.id === selectedValue)) select.value = selectedValue;
 }
 
-function startOfUtcDay(date = new Date()) {
+function renderAnimePicker() {
+  const animeSelect = document.querySelector("#anime-select");
+  const previous = animeSelect.value;
+  const items = activeAnimesForPacks().map((anime) => ({ id: anime.name, name: anime.name }));
+  fillSelect(animeSelect, items, t("noAnime"));
+  if (items.some((anime) => anime.id === previous)) animeSelect.value = previous;
+  const ownerAnimeOptions = animeSeries.map((anime) => ({
+    id: anime.id,
+    name: `${anime.name}${anime.is_active ? "" : ` · ${t("inactive")}`}`,
+  }));
+  fillSelect(document.querySelector("#owner-card-anime"), ownerAnimeOptions, t("selectAnime"));
+  const ownerAnimeFilter = document.querySelector("#owner-anime-filter");
+  const selectedAnimeId = ownerAnimeFilter.value;
+  ownerAnimeFilter.innerHTML = `<option value="">${escapeHtml(t("allAnime"))}</option>${animeSeries.map((anime) => (
+    `<option value="${escapeHtml(anime.id)}">${escapeHtml(anime.name)}</option>`
+  )).join("")}`;
+  if (animeSeries.some((anime) => anime.id === selectedAnimeId)) ownerAnimeFilter.value = selectedAnimeId;
+}
+
+function renderOwnerLists() {
+  document.querySelector("#anime-count").textContent = animeSeries.length.toLocaleString(language);
+  document.querySelector("#anime-list").innerHTML = animeSeries.map((anime) => `
+    <article class="owner-record">
+      <div class="anime-record-image">${anime.image_url ? `<img src="${escapeHtml(anime.image_url)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : `<span>${escapeHtml(anime.name.slice(0, 1).toLocaleUpperCase(language))}</span>`}</div>
+      <div class="owner-record-copy"><strong>${escapeHtml(anime.name)}</strong><span>${escapeHtml(anime.description || t("noAnimeDescription"))}</span><em class="${anime.is_active ? "record-live" : "record-paused"}">${escapeHtml(anime.is_active ? t("active") : t("inactive"))}</em></div>
+      <button class="secondary-button compact-button edit-anime" type="button" data-anime-id="${escapeHtml(anime.id)}">${escapeHtml(t("edit"))}</button>
+    </article>`).join("");
+  attachImageFallbacks(document.querySelector("#anime-list"));
+
+  const filterId = document.querySelector("#owner-anime-filter").value;
+  const visibleCards = characterCards.filter((card) => !filterId || card.anime_id === filterId);
+  document.querySelector("#owner-card-count").textContent = visibleCards.length.toLocaleString(language);
+  document.querySelector("#owner-card-list").innerHTML = visibleCards.map((card) => `
+    <article class="owner-record character-owner-record">
+      <div class="catalog-row-art" style="--card-accent:${safeColor(card.rarity.color_hex, "#b496ff")}">${card.image_url ? `<img src="${escapeHtml(card.image_url)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : `<span>${escapeHtml(card.character_name.slice(0, 1).toLocaleUpperCase(language))}</span>`}</div>
+      <div class="owner-record-copy"><strong>${escapeHtml(card.character_name)}</strong><span>${escapeHtml(card.anime?.name || t("unknownAnime"))}${card.manga_artist ? ` · ${escapeHtml(card.manga_artist)}` : ""}</span><em class="${card.is_active ? "record-live" : "record-paused"}">${escapeHtml(card.is_active ? t("active") : t("inactive"))} · ${escapeHtml(card.rarity.name)}</em></div>
+      <button class="secondary-button compact-button edit-character" type="button" data-card-id="${escapeHtml(card.id)}">${escapeHtml(t("edit"))}</button>
+    </article>`).join("");
+  renderRarityList();
+  attachImageFallbacks(document.querySelector("#owner-card-list"));
+}
+
+function renderRarityList() {
+  document.querySelector("#rarity-list").innerHTML = rarityLevels.map((rarity) => `
+    <button class="rarity-entry" type="button" data-rarity-id="${escapeHtml(rarity.id)}">
+      <span class="rarity-swatch" style="--rarity-color:${safeColor(rarity.color_hex)}"></span>
+      <span class="rarity-entry-name">${escapeHtml(rarity.name)}<small>${escapeHtml(rarity.slug)}</small></span>
+      <span class="rarity-entry-weight">${escapeHtml(String(rarity.draw_weight))}×</span>
+      <span class="${rarity.is_active ? "record-live" : "record-paused"}">${escapeHtml(rarity.is_active ? t("active") : t("inactive"))}</span>
+    </button>`).join("");
+}
+
+function renderOwner() {
+  const ownerNavigation = document.querySelector("#owner-nav");
+  ownerNavigation.hidden = !isOwner;
+  if (activePanel === "owner" && !isOwner) activePanel = "collection";
+  if (!isOwner) return;
+  document.querySelector("#anime-form-title").textContent = t(editingAnimeId ? "editAnime" : "createAnime");
+  document.querySelector("#anime-submit").textContent = t(editingAnimeId ? "saveChanges" : "createAnime");
+  document.querySelector("#anime-cancel").hidden = !editingAnimeId;
+  document.querySelector("#owner-card-form-title").textContent = t(editingCardId ? "editCharacter" : "createCharacter");
+  document.querySelector("#owner-card-submit").textContent = t(editingCardId ? "saveChanges" : "createCharacter");
+  document.querySelector("#owner-card-cancel").hidden = !editingCardId;
+  document.querySelector("#rarity-form-title").textContent = t(editingRarityId ? "editRarity" : "createRarity");
+  document.querySelector("#rarity-submit").textContent = t(editingRarityId ? "saveChanges" : "createRarity");
+  document.querySelector("#rarity-cancel").hidden = !editingRarityId;
+  renderAnimePicker();
+  const currentRarity = document.querySelector("#owner-card-rarity").value;
+  fillSelect(document.querySelector("#owner-card-rarity"), rarityLevels
+    .filter((rarity) => rarity.is_active || (editingCardId && characterCards.find((card) => card.id === editingCardId)?.rarity_id === rarity.id))
+    .map((rarity) => ({ id: rarity.id, name: rarity.name })), t("selectRarity"), currentRarity);
+  renderOwnerLists();
+}
+
+function utcDayStart(date = new Date()) {
   return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
 }
 
@@ -207,7 +288,7 @@ function shortDuration(milliseconds) {
 
 function renderPackStatus() {
   const now = Date.now();
-  const todayStart = startOfUtcDay();
+  const todayStart = utcDayStart();
   const todayPacks = packs.filter((pack) => new Date(pack.opened_at).getTime() >= todayStart && pack.pack_type === "daily").length;
   const dailyRemaining = Math.max(0, 2 - todayPacks);
   const latestSpecial = packs
@@ -216,14 +297,13 @@ function renderPackStatus() {
     .sort((first, second) => second - first)[0];
   const specialAvailableAt = latestSpecial ? latestSpecial + 72 * 60 * 60 * 1000 : 0;
   const specialRemaining = Math.max(0, specialAvailableAt - now);
-  const catalogAvailable = dataReady && catalog.length > 0;
+  const catalogAvailable = dataReady && activeAnimesForPacks().length > 0;
 
   document.querySelector("#daily-packs-remaining").textContent = `${dailyRemaining} / 2`;
   document.querySelector("#daily-progress-fill").style.width = `${(dailyRemaining / 2) * 100}%`;
   document.querySelector("#daily-reset-label").textContent = t("dailyReset");
   document.querySelector("#daily-pack-button").disabled = loadingPack || dailyRemaining === 0 || !catalogAvailable;
-  const specialLabel = document.querySelector("#special-reset-label");
-  specialLabel.textContent = specialRemaining
+  document.querySelector("#special-reset-label").textContent = specialRemaining
     ? t("specialReset", { time: shortDuration(specialRemaining) })
     : t("specialReady");
   document.querySelector("#anime-pack-button").disabled = loadingPack
@@ -258,8 +338,9 @@ function render() {
   renderPanels();
   if (!signedIn) return;
   renderCollection();
-  renderCatalog();
+  renderAnimePicker();
   renderPackStatus();
+  renderOwner();
 }
 
 async function loadAccountData() {
@@ -267,13 +348,17 @@ async function loadAccountData() {
   const userId = currentUser.id;
   dataReady = false;
   dataError = "";
-  renderPackStatus();
-  const [catalogResult, collectionResult, packsResult] = await Promise.all([
-    supabaseClient.from("card_catalog")
-      .select("id,anime_name,character_name,image_url,rarity,created_at")
-      .eq("user_id", userId)
-      .order("anime_name", { ascending: true })
-      .order("character_name", { ascending: true }),
+  const [ownerResult, animeResult, rarityResult, cardsResult, collectionResult, packsResult] = await Promise.all([
+    supabaseClient.rpc("is_site_owner"),
+    supabaseClient.from("anime_series")
+      .select("id,name,description,image_url,is_active,created_at,updated_at")
+      .order("name", { ascending: true }),
+    supabaseClient.from("rarity_levels")
+      .select("id,name,slug,color_hex,draw_weight,is_active,sort_order")
+      .order("sort_order", { ascending: true })
+      .order("draw_weight", { ascending: false }),
+    supabaseClient.from("character_cards")
+      .select("id,anime_id,character_name,manga_artist,description,image_url,rarity_id,is_active,created_at,updated_at"),
     supabaseClient.from("user_collection")
       .select("id,card_data,pack_id,acquired_at")
       .eq("user_id", userId)
@@ -284,9 +369,26 @@ async function loadAccountData() {
       .order("opened_at", { ascending: false }),
   ]);
   if (currentUser?.id !== userId) return;
-  const failed = [catalogResult, collectionResult, packsResult].find((result) => result.error);
+  const failed = [ownerResult, animeResult, rarityResult, cardsResult, collectionResult, packsResult]
+    .find((result) => result.error);
   if (failed) throw new Error(failed.error.message);
-  catalog = catalogResult.data || [];
+  isOwner = ownerResult.data === true;
+  animeSeries = animeResult.data || [];
+  rarityLevels = rarityResult.data || [];
+  const animeById = new Map(animeSeries.map((anime) => [anime.id, anime]));
+  const rarityById = new Map(rarityLevels.map((rarity) => [rarity.id, rarity]));
+  characterCards = (cardsResult.data || []).map((card) => ({
+    ...card,
+    anime: animeById.get(card.anime_id),
+    rarity: rarityById.get(card.rarity_id) || {
+      id: card.rarity_id,
+      name: t("unknownRarity"),
+      slug: "unknown",
+      color_hex: "#b496ff",
+      draw_weight: 1,
+      is_active: false,
+    },
+  })).filter((card) => card.anime);
   collection = collectionResult.data || [];
   packs = packsResult.data || [];
   dataReady = true;
@@ -298,9 +400,12 @@ async function setCurrentUser(user) {
   if (accountInitialized && currentUser?.id === user?.id) return;
   accountInitialized = true;
   currentUser = user;
-  catalog = [];
+  animeSeries = [];
+  rarityLevels = [];
+  characterCards = [];
   collection = [];
   packs = [];
+  isOwner = false;
   dataReady = false;
   dataError = "";
   if (user && supabaseClient) {
@@ -348,6 +453,25 @@ async function signInWithProvider(provider) {
   }
 }
 
+function setOpeningState(isOpening) {
+  const graphic = document.querySelector("#opening-graphic");
+  const message = document.querySelector("#opening-message");
+  if (isOpening) {
+    message.textContent = t("packOpening");
+    graphic.classList.remove("is-opening");
+    void graphic.offsetWidth;
+    graphic.classList.add("is-opening");
+    if (!openingDialog.open) openingDialog.showModal();
+  } else if (openingDialog.open) {
+    openingDialog.close();
+    graphic.classList.remove("is-opening");
+  }
+}
+
+function wait(milliseconds) {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+}
+
 async function openPack(packType, animeName = "") {
   if (!currentUser) {
     showAuth();
@@ -356,20 +480,33 @@ async function openPack(packType, animeName = "") {
   if (!supabaseClient || !dataReady || loadingPack) return;
   loadingPack = true;
   renderPackStatus();
+  setOpeningState(true);
+  const animation = wait(window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 1500);
   try {
-    const { data, error } = await supabaseClient.rpc("open_card_pack", {
-      p_pack_type: packType,
-      p_anime_name: packType === "anime" ? animeName : null,
-    });
-    if (error) throw error;
-    await loadAccountData();
-    const pack = data?.pack || data;
+    const [response] = await Promise.all([
+      supabaseClient.rpc("open_card_pack", {
+        p_pack_type: packType,
+        p_anime_name: packType === "anime" ? animeName : null,
+      }),
+      animation,
+    ]);
+    if (response.error) throw response.error;
+    const pack = response.data?.pack || response.data;
     const openedCards = Array.isArray(pack?.cards) ? pack.cards : [];
     if (openedCards.length !== (packType === "daily" ? 5 : 8)) {
       throw new Error(t("unexpectedPack"));
     }
+    setOpeningState(false);
     showReveal(pack, openedCards);
+    try {
+      await loadAccountData();
+    } catch (error) {
+      dataError = t("dataLoadError", { error: error.message });
+      render();
+      notify(t("collectionRefreshError", { error: error.message }), true);
+    }
   } catch (error) {
+    setOpeningState(false);
     notify(error.message || t("packError"), true);
   } finally {
     loadingPack = false;
@@ -384,9 +521,86 @@ function showReveal(pack, cards) {
   document.querySelector("#reveal-subtitle").textContent = t("cardsAdded", { count: cards.length });
   document.querySelector("#reveal-title").textContent = title;
   const grid = document.querySelector("#reveal-grid");
-  grid.innerHTML = cards.map((card) => cardMarkup(card)).join("");
+  grid.innerHTML = cards.map((card, index) => cardMarkup(card, 1, index)).join("");
   attachImageFallbacks(grid);
   revealDialog.showModal();
+}
+
+function setFormError(id, error) {
+  const output = document.querySelector(`#${id}`);
+  output.textContent = error;
+  output.hidden = false;
+}
+
+function clearFormError(id) {
+  const output = document.querySelector(`#${id}`);
+  output.textContent = "";
+  output.hidden = true;
+}
+
+function normalizeOptionalUrl(value) {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const url = new URL(trimmed);
+  if (url.protocol !== "https:") throw new Error(t("httpsImageRequired"));
+  return trimmed;
+}
+
+async function ownerImageUrl(urlSelector, fileSelector, folder) {
+  const fileInput = document.querySelector(fileSelector);
+  const file = fileInput.files[0];
+  if (!file) return normalizeOptionalUrl(document.querySelector(urlSelector).value);
+  const extensions = {
+    "image/avif": "avif",
+    "image/gif": "gif",
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+  };
+  if (!extensions[file.type] || file.size > 5 * 1024 * 1024) {
+    throw new Error(t("invalidImageUpload"));
+  }
+  if (!currentUser || !supabaseClient) throw new Error(t("supabaseSetup"));
+  const path = `${currentUser.id}/${folder}/${crypto.randomUUID()}.${extensions[file.type]}`;
+  const { error } = await supabaseClient.storage.from("clair-card-art")
+    .upload(path, file, { cacheControl: "31536000", contentType: file.type, upsert: false });
+  if (error) throw error;
+  return supabaseClient.storage.from("clair-card-art").getPublicUrl(path).data.publicUrl;
+}
+
+function cancelAnimeEdit() {
+  editingAnimeId = "";
+  document.querySelector("#anime-form").reset();
+  document.querySelector("#owner-anime-active").checked = true;
+  document.querySelector("#owner-anime-image-file").value = "";
+  document.querySelector("#anime-form-title").textContent = t("createAnime");
+  document.querySelector("#anime-submit").textContent = t("createAnime");
+  document.querySelector("#anime-cancel").hidden = true;
+  clearFormError("anime-error");
+}
+
+function cancelCardEdit() {
+  editingCardId = "";
+  document.querySelector("#owner-card-form").reset();
+  document.querySelector("#owner-card-active").checked = true;
+  document.querySelector("#owner-card-image-file").value = "";
+  document.querySelector("#owner-card-form-title").textContent = t("createCharacter");
+  document.querySelector("#owner-card-submit").textContent = t("createCharacter");
+  document.querySelector("#owner-card-cancel").hidden = true;
+  clearFormError("owner-card-error");
+  renderOwner();
+}
+
+function cancelRarityEdit() {
+  editingRarityId = "";
+  document.querySelector("#rarity-form").reset();
+  document.querySelector("#owner-rarity-color").value = "#b496ff";
+  document.querySelector("#owner-rarity-weight").value = "10";
+  document.querySelector("#owner-rarity-active").checked = true;
+  document.querySelector("#rarity-form-title").textContent = t("createRarity");
+  document.querySelector("#rarity-submit").textContent = t("createRarity");
+  document.querySelector("#rarity-cancel").hidden = true;
+  clearFormError("rarity-error");
 }
 
 document.querySelector("#language-select").addEventListener("change", (event) => setLanguage(event.target.value));
@@ -394,6 +608,7 @@ document.querySelector("#account-button").addEventListener("click", showAuth);
 document.querySelector("#gate-sign-in").addEventListener("click", showAuth);
 document.querySelector("#close-auth").addEventListener("click", () => authDialog.close());
 document.querySelector("#close-reveal").addEventListener("click", () => revealDialog.close());
+document.querySelector("#close-opening").addEventListener("click", () => setOpeningState(false));
 document.querySelector("#reveal-done").addEventListener("click", () => {
   revealDialog.close();
   activePanel = "collection";
@@ -468,65 +683,6 @@ document.querySelector("#sign-out").addEventListener("click", async () => {
   }
 });
 
-document.querySelector("#catalog-form").addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const errorOutput = document.querySelector("#catalog-error");
-  errorOutput.hidden = true;
-  if (!currentUser || !supabaseClient) {
-    showAuth();
-    return;
-  }
-  const imageValue = document.querySelector("#image-url").value.trim();
-  if (imageValue) {
-    try {
-      if (new URL(imageValue).protocol !== "https:") throw new Error(t("httpsImageRequired"));
-    } catch (error) {
-      errorOutput.textContent = error.message || t("httpsImageRequired");
-      errorOutput.hidden = false;
-      return;
-    }
-  }
-  const submit = document.querySelector("#catalog-submit");
-  submit.disabled = true;
-  const newCard = {
-    user_id: currentUser.id,
-    anime_name: document.querySelector("#anime-name").value.trim(),
-    character_name: document.querySelector("#character-name").value.trim(),
-    image_url: imageValue || null,
-    rarity: document.querySelector("#character-rarity").value,
-  };
-  try {
-    const { error } = await supabaseClient.from("card_catalog").insert(newCard);
-    if (error) throw error;
-    document.querySelector("#catalog-form").reset();
-    await loadAccountData();
-    notify(t("characterAdded"));
-  } catch (error) {
-    errorOutput.textContent = error.message || t("catalogSaveError");
-    errorOutput.hidden = false;
-  } finally {
-    submit.disabled = false;
-  }
-});
-
-document.querySelector("#catalog-list").addEventListener("click", async (event) => {
-  const button = event.target.closest(".delete-catalog-card");
-  if (!button || !currentUser || !supabaseClient) return;
-  const card = catalog.find((entry) => entry.id === button.dataset.cardId);
-  if (!card || !window.confirm(t("confirmRemoveCharacter", { name: card.character_name }))) return;
-  button.disabled = true;
-  try {
-    const { error } = await supabaseClient.from("card_catalog")
-      .delete().eq("id", card.id).eq("user_id", currentUser.id);
-    if (error) throw error;
-    await loadAccountData();
-    notify(t("characterRemoved"));
-  } catch (error) {
-    button.disabled = false;
-    notify(error.message || t("catalogSaveError"), true);
-  }
-});
-
 document.querySelector("#daily-pack-button").addEventListener("click", () => openPack("daily"));
 document.querySelector("#anime-pack-button").addEventListener("click", () => {
   const animeName = document.querySelector("#anime-select").value;
@@ -542,17 +698,27 @@ document.querySelector("#collection-filters").addEventListener("click", (event) 
 });
 document.querySelector("#collection-grid").addEventListener("click", (event) => {
   const card = event.target.closest(".character-card");
-  if (!card) return;
-  card.classList.toggle("card-flipped");
+  toggleCardDetails(card);
+});
+document.querySelector("#collection-grid").addEventListener("keydown", (event) => {
+  if ((event.key === "Enter" || event.key === " ") && event.target.matches(".character-card")) {
+    event.preventDefault();
+    toggleCardDetails(event.target);
+  }
 });
 document.querySelector("#reveal-grid").addEventListener("click", (event) => {
   const card = event.target.closest(".character-card");
-  if (!card) return;
-  card.classList.toggle("card-flipped");
+  toggleCardDetails(card);
+});
+document.querySelector("#reveal-grid").addEventListener("keydown", (event) => {
+  if ((event.key === "Enter" || event.key === " ") && event.target.matches(".character-card")) {
+    event.preventDefault();
+    toggleCardDetails(event.target);
+  }
 });
 document.querySelectorAll("[data-panel]").forEach((button) => {
   button.addEventListener("click", () => {
-    activePanel = button.dataset.panel;
+    activePanel = button.dataset.panel === "owner" && !isOwner ? "collection" : button.dataset.panel;
     renderPanels();
   });
 });
@@ -562,6 +728,167 @@ document.querySelectorAll("[data-go-panel]").forEach((button) => {
     renderPanels();
   });
 });
+
+document.querySelector("#anime-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!isOwner || !supabaseClient) return;
+  clearFormError("anime-error");
+  const submit = document.querySelector("#anime-submit");
+  submit.disabled = true;
+  try {
+    const wasEditing = Boolean(editingAnimeId);
+    const record = {
+      name: document.querySelector("#owner-anime-name").value.trim(),
+      description: document.querySelector("#owner-anime-description").value.trim(),
+      image_url: await ownerImageUrl("#owner-anime-image", "#owner-anime-image-file", "anime"),
+      is_active: document.querySelector("#owner-anime-active").checked,
+      updated_at: new Date().toISOString(),
+    };
+    const request = editingAnimeId
+      ? supabaseClient.from("anime_series").update(record).eq("id", editingAnimeId)
+      : supabaseClient.from("anime_series").insert(record);
+    const { error } = await request;
+    if (error) throw error;
+    cancelAnimeEdit();
+    await loadAccountData();
+    notify(t(wasEditing ? "animeUpdated" : "animeCreated"));
+  } catch (error) {
+    setFormError("anime-error", error.message || t("ownerSaveError"));
+  } finally {
+    submit.disabled = false;
+  }
+});
+
+document.querySelector("#anime-list").addEventListener("click", (event) => {
+  const button = event.target.closest(".edit-anime");
+  if (!button || !isOwner) return;
+  const anime = animeSeries.find((entry) => entry.id === button.dataset.animeId);
+  if (!anime) return;
+  editingAnimeId = anime.id;
+  document.querySelector("#owner-anime-name").value = anime.name;
+  document.querySelector("#owner-anime-description").value = anime.description;
+  document.querySelector("#owner-anime-image").value = anime.image_url || "";
+  document.querySelector("#owner-anime-image-file").value = "";
+  document.querySelector("#owner-anime-active").checked = anime.is_active;
+  document.querySelector("#anime-form-title").textContent = t("editAnime");
+  document.querySelector("#anime-submit").textContent = t("saveChanges");
+  document.querySelector("#anime-cancel").hidden = false;
+  document.querySelector("#owner-anime-name").focus();
+});
+document.querySelector("#anime-cancel").addEventListener("click", cancelAnimeEdit);
+
+document.querySelector("#owner-card-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!isOwner || !supabaseClient) return;
+  clearFormError("owner-card-error");
+  const submit = document.querySelector("#owner-card-submit");
+  submit.disabled = true;
+  try {
+    const wasEditing = Boolean(editingCardId);
+    const record = {
+      anime_id: document.querySelector("#owner-card-anime").value,
+      character_name: document.querySelector("#owner-card-name").value.trim(),
+      manga_artist: document.querySelector("#owner-card-mangaka").value.trim(),
+      description: document.querySelector("#owner-card-description").value.trim(),
+      image_url: await ownerImageUrl("#owner-card-image", "#owner-card-image-file", "characters"),
+      rarity_id: document.querySelector("#owner-card-rarity").value,
+      is_active: document.querySelector("#owner-card-active").checked,
+      updated_at: new Date().toISOString(),
+    };
+    const request = editingCardId
+      ? supabaseClient.from("character_cards").update(record).eq("id", editingCardId)
+      : supabaseClient.from("character_cards").insert(record);
+    const { error } = await request;
+    if (error) throw error;
+    cancelCardEdit();
+    await loadAccountData();
+    notify(t(wasEditing ? "characterUpdated" : "characterCreated"));
+  } catch (error) {
+    setFormError("owner-card-error", error.message || t("ownerSaveError"));
+  } finally {
+    submit.disabled = false;
+  }
+});
+
+document.querySelector("#owner-card-list").addEventListener("click", (event) => {
+  const button = event.target.closest(".edit-character");
+  if (!button || !isOwner) return;
+  const card = characterCards.find((entry) => entry.id === button.dataset.cardId);
+  if (!card) return;
+  editingCardId = card.id;
+  renderOwner();
+  document.querySelector("#owner-card-anime").value = card.anime_id;
+  document.querySelector("#owner-card-name").value = card.character_name;
+  document.querySelector("#owner-card-mangaka").value = card.manga_artist;
+  document.querySelector("#owner-card-description").value = card.description;
+  document.querySelector("#owner-card-image").value = card.image_url || "";
+  document.querySelector("#owner-card-image-file").value = "";
+  document.querySelector("#owner-card-rarity").value = card.rarity_id;
+  document.querySelector("#owner-card-active").checked = card.is_active;
+  document.querySelector("#owner-card-form-title").textContent = t("editCharacter");
+  document.querySelector("#owner-card-submit").textContent = t("saveChanges");
+  document.querySelector("#owner-card-cancel").hidden = false;
+  document.querySelector("#owner-card-name").focus();
+});
+document.querySelector("#owner-card-cancel").addEventListener("click", cancelCardEdit);
+document.querySelector("#owner-anime-filter").addEventListener("change", renderOwnerLists);
+
+document.querySelector("#rarity-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!isOwner || !supabaseClient) return;
+  clearFormError("rarity-error");
+  const submit = document.querySelector("#rarity-submit");
+  submit.disabled = true;
+  try {
+    const wasEditing = Boolean(editingRarityId);
+    const existingRarity = rarityLevels.find((rarity) => rarity.id === editingRarityId);
+    const record = {
+      name: document.querySelector("#owner-rarity-name").value.trim(),
+      slug: document.querySelector("#owner-rarity-slug").value.trim().toLowerCase(),
+      color_hex: safeColor(document.querySelector("#owner-rarity-color").value),
+      draw_weight: Number(document.querySelector("#owner-rarity-weight").value),
+      is_active: document.querySelector("#owner-rarity-active").checked,
+      sort_order: existingRarity?.sort_order
+        ?? Math.max(0, ...rarityLevels.map((rarity) => rarity.sort_order)) + 1,
+    };
+    const request = editingRarityId
+      ? supabaseClient.from("rarity_levels").update(record).eq("id", editingRarityId)
+      : supabaseClient.from("rarity_levels").insert(record);
+    const { error } = await request;
+    if (error) throw error;
+    cancelRarityEdit();
+    await loadAccountData();
+    notify(t(wasEditing ? "rarityUpdated" : "rarityCreated"));
+  } catch (error) {
+    setFormError("rarity-error", error.message || t("ownerSaveError"));
+  } finally {
+    submit.disabled = false;
+  }
+});
+document.querySelector("#rarity-list").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-rarity-id]");
+  if (!button || !isOwner) return;
+  const rarity = rarityLevels.find((entry) => entry.id === button.dataset.rarityId);
+  if (!rarity) return;
+  editingRarityId = rarity.id;
+  document.querySelector("#owner-rarity-name").value = rarity.name;
+  document.querySelector("#owner-rarity-slug").value = rarity.slug;
+  document.querySelector("#owner-rarity-color").value = safeColor(rarity.color_hex);
+  document.querySelector("#owner-rarity-weight").value = rarity.draw_weight;
+  document.querySelector("#owner-rarity-active").checked = rarity.is_active;
+  document.querySelector("#rarity-form-title").textContent = t("editRarity");
+  document.querySelector("#rarity-submit").textContent = t("saveChanges");
+  document.querySelector("#rarity-cancel").hidden = false;
+  document.querySelector("#owner-rarity-name").focus();
+});
+document.querySelector("#rarity-cancel").addEventListener("click", cancelRarityEdit);
+document.querySelector("#owner-rarity-name").addEventListener("input", (event) => {
+  if (editingRarityId) return;
+  const slug = event.target.value.trim().toLocaleLowerCase("en")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  document.querySelector("#owner-rarity-slug").value = slug.slice(0, 24);
+});
+
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden && currentUser && supabaseClient) {
     loadAccountData().catch((error) => {
