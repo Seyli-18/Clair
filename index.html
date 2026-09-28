@@ -3,252 +3,183 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#f7f8fc">
-    <meta name="description" content="Clair, votre espace simple et élégant pour organiser vos tâches.">
-    <title>Clair — Espace de travail</title>
+    <meta name="theme-color" content="#11101a">
+    <meta name="description" content="Collectionne les cartes de tes personnages d’anime préférés avec Clair Cards.">
+    <title>Clair Cards — Collectionne tes univers</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&family=Noto+Sans+Arabic:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=3">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css?v=4">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-config.js" defer></script>
-    <script src="translations.js?v=2" defer></script>
-    <script src="app.js?v=3" defer></script>
+    <script src="translations.js?v=3" defer></script>
+    <script src="app.js?v=4" defer></script>
   </head>
   <body>
+    <div class="ambient ambient-one" aria-hidden="true"></div>
+    <div class="ambient ambient-two" aria-hidden="true"></div>
     <div class="app-shell">
-      <aside class="sidebar">
-        <a class="brand" href="./" aria-label="Clair, accueil" data-i18n-aria="home">
-          <span class="brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 32 32" fill="none"><path d="M8 16.5 13.2 22 24 10" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="16" cy="16" r="14" stroke="currentColor" stroke-width="2"/></svg>
-          </span>
-          <span>clair<span class="brand-period">.</span></span>
+      <header class="topbar">
+        <a class="brand" href="./" aria-label="Clair Cards">
+          <span class="brand-mark" aria-hidden="true">✦</span>
+          <span>clair<span class="brand-accent">cards</span><span class="brand-period">.</span></span>
         </a>
-
-        <div class="workspace-label" data-i18n="workspace">ESPACE DE TRAVAIL</div>
-        <nav class="primary-nav" aria-label="Navigation principale" data-i18n-aria="mainNavigation">
-          <button class="nav-link active" type="button" data-filter="all">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></svg>
-            <span data-i18n="overview">Vue d’ensemble</span><span class="nav-count" id="nav-total">0</span>
-          </button>
-          <button class="nav-link" type="button" data-filter="active">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/></svg>
-            <span data-i18n="active">À faire</span><span class="nav-count" id="nav-active">0</span>
-          </button>
-          <button class="nav-link" type="button" data-filter="completed">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4.5 4.5L19 7"/><circle cx="12" cy="12" r="9"/></svg>
-            <span data-i18n="completed">Terminées</span>
-          </button>
+        <nav class="main-nav" aria-label="Navigation principale">
+          <button class="nav-button active" type="button" data-panel="collection" data-i18n="collection">Collection</button>
+          <button class="nav-button" type="button" data-panel="packs" data-i18n="packs">Paquets</button>
+          <button class="nav-button" type="button" data-panel="catalog" data-i18n="catalog">Mon catalogue</button>
         </nav>
-
-        <div class="sidebar-bottom">
-          <div class="quote-card">
-            <span class="quote-sparkle">✳</span>
-            <p data-i18n="quote">« La simplicité est la sophistication suprême. »</p>
-            <span class="quote-author">— Léonard de Vinci</span>
-          </div>
-          <div class="profile">
-            <div class="avatar" id="profile-avatar" aria-hidden="true">C</div>
-            <div class="profile-copy"><strong id="profile-name" data-i18n="personalSpace">Mon espace</strong><span id="profile-caption" data-i18n="personalOrg">Organisation perso</span></div>
-          </div>
+        <div class="header-actions">
+          <label class="language-picker">
+            <span class="visually-hidden" data-i18n="language">Langue</span>
+            <select id="language-select" aria-label="Langue" data-i18n-aria="language">
+              <option value="fr">FR</option><option value="en">EN</option><option value="ar">AR</option>
+              <option value="it">IT</option><option value="es">ES</option><option value="de">DE</option>
+            </select>
+          </label>
+          <button class="account-button" id="account-button" type="button" data-i18n="signIn">Se connecter</button>
         </div>
-      </aside>
+      </header>
 
       <main class="main-content">
-        <header class="topbar">
-          <div class="breadcrumb"><span data-i18n="personalSpace">Mon espace</span><span class="breadcrumb-slash">/</span><strong id="breadcrumb-current">Vue d’ensemble</strong></div>
-          <div class="topbar-actions">
-            <div class="today-label"><span class="today-dot"></span><span id="today-date"></span></div>
-            <label class="language-picker"><span class="visually-hidden" data-i18n="language">Langue</span><select id="language-select" aria-label="Langue" data-i18n-aria="language"><option value="fr">Français</option><option value="en">English</option><option value="ar">العربية</option><option value="it">Italiano</option><option value="es">Español</option><option value="de">Deutsch</option></select></label>
-            <button class="account-button" id="account-button" type="button" data-i18n="signIn">Se connecter</button>
-            <button class="icon-button" id="theme-toggle" type="button" aria-label="Basculer le thème" title="Basculer le thème" data-i18n-aria="themeToggle" data-i18n-title="themeToggle">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg>
-            </button>
+        <section class="welcome-row">
+          <div>
+            <p class="eyebrow"><span class="live-dot"></span><span data-i18n="eyebrow">TON PASS POUR DE NOUVEAUX UNIVERS</span></p>
+            <h1><span data-i18n="welcomeLine1">Les univers que tu aimes,</span><br><span class="gradient-text" data-i18n="welcomeLine2">à collectionner.</span></h1>
+            <p class="welcome-copy" data-i18n="welcomeCopy">Ouvre tes paquets, découvre tes personnages et complète ta collection, un jour après l’autre.</p>
           </div>
-        </header>
-        <nav class="feature-nav" aria-label="Outils Clair" data-i18n-aria="featureNav">
-          <button class="feature-tab selected" type="button" data-view="tasks" data-i18n="tasksView">Tâches</button>
-          <button class="feature-tab" type="button" data-view="mindmap" data-i18n="mindmapView">Cartes mentales</button>
-          <button class="feature-tab" type="button" data-view="agenda" data-i18n="agendaView">Agenda</button>
-          <button class="feature-tab" type="button" data-view="timetable" data-i18n="timetableView">Emploi du temps</button>
-        </nav>
+          <div class="collection-total">
+            <span class="collection-total-icon" aria-hidden="true">✧</span>
+            <span class="collection-total-value" id="collection-count">0</span>
+            <span class="collection-total-label" data-i18n="cardsCollected">CARTES COLLECTIONNÉES</span>
+          </div>
+        </section>
 
-        <div class="content-wrap app-view" data-view-panel="tasks">
-          <section class="welcome-section">
-            <div>
-              <div class="eyebrow"><span class="eyebrow-line"></span> <span data-i18n="eyebrow">VOTRE ESPACE, EN MIEUX</span></div>
-              <h1><span data-i18n="welcomeLine1">Faisons place à</span><br><span data-i18n="welcomeLine2">l’essentiel.</span></h1>
-              <p class="welcome-copy" data-i18n="welcomeCopy">Un pas après l’autre, vos idées prennent forme.</p>
+        <section class="account-gate" id="auth-gate" hidden>
+          <div class="gate-orbit" aria-hidden="true"><span>✦</span><span>✧</span><span>✳</span></div>
+          <p class="eyebrow" data-i18n="yourCollection">TA COLLECTION T’ATTEND</p>
+          <h2 data-i18n="gateTitle">Entre dans le jeu.</h2>
+          <p data-i18n="gateCopy">Connecte-toi pour ouvrir des paquets et garder tes cartes synchronisées sur tous tes appareils.</p>
+          <button class="primary-button" id="gate-sign-in" type="button"><span data-i18n="createOrSignIn">Créer un compte ou se connecter</span><span aria-hidden="true">↗</span></button>
+          <p class="privacy-note"><span aria-hidden="true">◈</span><span data-i18n="accountRequired">Un compte est obligatoire pour enregistrer tes cartes.</span></p>
+        </section>
+
+        <div class="game-content" id="game-content" hidden>
+          <p class="data-error" id="data-error" role="alert" hidden></p>
+          <section class="game-panel active" data-panel-content="collection">
+            <div class="section-heading collection-heading">
+              <div><p class="eyebrow" data-i18n="yourCollection">TA COLLECTION</p><h2 data-i18n="collectionTitle">Tes découvertes.</h2></div>
+              <label class="search-field"><span aria-hidden="true">⌕</span><input id="collection-search" type="search" placeholder="Rechercher une carte…" data-i18n-placeholder="searchCards" autocomplete="off"></label>
             </div>
-            <div class="welcome-art" aria-hidden="true">
-              <div class="art-orbit orbit-one"></div><div class="art-orbit orbit-two"></div>
-              <div class="art-sun"></div><div class="art-leaf leaf-one"></div><div class="art-leaf leaf-two"></div>
-              <div class="art-spark spark-one">✳</div><div class="art-spark spark-two">✦</div>
+            <div class="collection-toolbar">
+              <div class="collection-filter" id="collection-filters"></div>
+              <span class="subtle-count" id="collection-subcount"></span>
+            </div>
+            <div class="card-grid" id="collection-grid"></div>
+            <div class="empty-state" id="collection-empty">
+              <span class="empty-glyph" aria-hidden="true">✧</span>
+              <h3 data-i18n="emptyCollectionTitle">Ta collection commence ici.</h3>
+              <p data-i18n="emptyCollectionCopy">Ajoute des personnages à ton catalogue, puis ouvre ton premier paquet.</p>
+              <button class="secondary-button" type="button" data-go-panel="catalog" data-i18n="addFirstCard">Ajouter un personnage</button>
             </div>
           </section>
 
-          <section class="stats-grid" aria-label="Résumé de vos tâches" data-i18n-aria="taskSummary">
-            <article class="stat-card">
-              <div class="stat-top"><span class="stat-label" data-i18n="toDo">À accomplir</span><span class="stat-icon icon-lavender"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5h11M8 12h11M8 19h11M4 5h.01M4 12h.01M4 19h.01"/></svg></span></div>
-              <div class="stat-value" id="stat-remaining">0</div>
-              <div class="stat-foot" data-i18n="smallSteps">petits pas, grand progrès</div>
-            </article>
-            <article class="stat-card">
-              <div class="stat-top"><span class="stat-label" data-i18n="doneAlready">Déjà terminées</span><span class="stat-icon icon-mint"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4.5 4.5L19 7"/></svg></span></div>
-              <div class="stat-value" id="stat-completed">0</div>
-              <div class="stat-foot" data-i18n="yourPace">vous avancez à votre rythme</div>
-            </article>
-            <article class="stat-card progress-card">
-              <div class="stat-top"><span class="stat-label" data-i18n="progress">Votre progression</span><span class="progress-percent" id="progress-percent">0%</span></div>
-              <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
-              <div class="stat-foot" id="progress-caption">Chaque chose en son temps.</div>
-            </article>
-          </section>
-
-          <section class="tasks-section" aria-labelledby="tasks-heading">
+          <section class="game-panel" data-panel-content="packs" hidden>
             <div class="section-heading">
-              <div><span class="section-kicker" data-i18n="yourList">VOTRE LISTE</span><h2 id="tasks-heading"><span data-i18n="yourTasks">Vos tâches</span><span class="heading-period">.</span></h2></div>
-              <button class="add-button" id="open-form" type="button"><span class="add-plus">+</span> <span data-i18n="newTask">Nouvelle tâche</span></button>
+              <div><p class="eyebrow" data-i18n="dailyDiscovery">DES DÉCOUVERTES, À TON RYTHME</p><h2 data-i18n="packsTitle">Tes prochains paquets.</h2></div>
+              <span class="server-badge"><span class="live-dot"></span><span data-i18n="savedToAccount">SAUVEGARDÉ SUR TON COMPTE</span></span>
             </div>
-            <div class="task-toolbar">
-              <div class="filter-tabs" role="group" aria-label="Filtrer les tâches" data-i18n-aria="filterTasks">
-                <button class="filter-tab selected" type="button" data-filter="all"><span data-i18n="all">Tout</span> <span id="filter-all-count">0</span></button>
-                <button class="filter-tab" type="button" data-filter="active" data-i18n="active">À faire</button>
-                <button class="filter-tab" type="button" data-filter="completed" data-i18n="completed">Terminées</button>
+            <div class="packs-grid">
+              <article class="pack-card daily-pack">
+                <div class="pack-card-top"><span class="pack-kicker" data-i18n="dailyPack">PAQUET QUOTIDIEN</span><span class="pack-stamp">× 2</span></div>
+                <div class="pack-art daily-art" aria-hidden="true"><span class="art-ring"></span><span class="art-star">✦</span><span class="art-orbit">✧</span><span class="art-shard"></span></div>
+                <div class="pack-info"><h3 data-i18n="dailyPackTitle">Le rendez-vous du jour</h3><p data-i18n="dailyPackCopy">Deux paquets par jour, cinq cartes chacun. Tous les univers de ton catalogue sont invités.</p></div>
+                <div class="pack-progress"><div class="progress-label"><span data-i18n="todayPacks">Paquets disponibles aujourd’hui</span><strong id="daily-packs-remaining">2 / 2</strong></div><div class="progress-track"><span id="daily-progress-fill"></span></div></div>
+                <button class="primary-button pack-open-button" id="daily-pack-button" type="button"><span data-i18n="openDailyPack">Ouvrir un paquet · 5 cartes</span><span aria-hidden="true">✦</span></button>
+                <p class="pack-timer" id="daily-reset-label"></p>
+              </article>
+              <article class="pack-card featured-pack">
+                <div class="pack-card-top"><span class="pack-kicker" data-i18n="animePack">PAQUET À THÈME</span><span class="pack-stamp special-stamp">8</span></div>
+                <div class="pack-art featured-art" aria-hidden="true"><span class="art-ring"></span><span class="art-star">✴</span><span class="art-orbit">✦</span><span class="art-shard"></span></div>
+                <div class="pack-info"><h3 data-i18n="animePackTitle">À toi de choisir l’univers</h3><p data-i18n="animePackCopy">Un paquet de huit cartes dédié à l’anime de ton choix, toutes les 72 heures.</p></div>
+                <label class="anime-picker"><span data-i18n="chooseAnime">Choisis un anime</span><select id="anime-select"><option value="" data-i18n="noAnime">Aucun anime dans le catalogue</option></select></label>
+                <button class="primary-button pack-open-button special-open-button" id="anime-pack-button" type="button"><span data-i18n="openAnimePack">Ouvrir le paquet · 8 cartes</span><span aria-hidden="true">✧</span></button>
+                <p class="pack-timer" id="special-reset-label"></p>
+              </article>
+            </div>
+            <p class="pack-footnote"><span aria-hidden="true">✳</span><span data-i18n="packFootnote">Les paquets sont ouverts et enregistrés de façon sécurisée avec ton compte.</span></p>
+          </section>
+
+          <section class="game-panel" data-panel-content="catalog" hidden>
+            <div class="section-heading">
+              <div><p class="eyebrow" data-i18n="catalogEyebrow">TON PETIT COIN DE CURATION</p><h2 data-i18n="catalogTitle">Ton catalogue.</h2></div>
+            </div>
+            <div class="catalog-layout">
+              <form class="catalog-form panel-card" id="catalog-form">
+                <span class="form-icon" aria-hidden="true">＋</span>
+                <h3 data-i18n="addCharacterTitle">Ajoute un personnage</h3>
+                <p class="form-intro" data-i18n="addCharacterCopy">Compose le catalogue de tes paquets. Les personnages et illustrations restent liés à ton compte.</p>
+                <label class="form-label" for="anime-name" data-i18n="animeName">Nom de l’anime</label>
+                <input class="form-input" id="anime-name" name="anime" maxlength="80" required placeholder="Ex. Mon anime préféré" data-i18n-placeholder="animePlaceholder">
+                <label class="form-label" for="character-name" data-i18n="characterName">Nom du personnage</label>
+                <input class="form-input" id="character-name" name="character" maxlength="80" required placeholder="Ex. Le héros" data-i18n-placeholder="characterPlaceholder">
+                <label class="form-label" for="image-url"><span data-i18n="imageUrl">Lien de l’illustration</span> <span class="optional" data-i18n="optional">(facultatif)</span></label>
+                <input class="form-input" id="image-url" name="image" type="url" maxlength="500" placeholder="https://…" data-i18n-placeholder="imagePlaceholder">
+                <span class="field-hint" data-i18n="imageRights">Ajoute uniquement une image que tu as le droit d’utiliser. Sans image, une carte illustrée sera créée automatiquement.</span>
+                <label class="form-label" for="character-rarity" data-i18n="rarity">Rareté</label>
+                <select class="form-input" id="character-rarity" name="rarity">
+                  <option value="common" data-i18n="common">Commune</option>
+                  <option value="rare" data-i18n="rare">Rare</option>
+                  <option value="epic" data-i18n="epic">Épique</option>
+                  <option value="legendary" data-i18n="legendary">Légendaire</option>
+                </select>
+                <p class="form-error" id="catalog-error" role="alert" hidden></p>
+                <button class="primary-button form-submit" id="catalog-submit" type="submit"><span data-i18n="saveCharacter">Ajouter au catalogue</span><span aria-hidden="true">↗</span></button>
+              </form>
+              <div class="catalog-list-panel">
+                <div class="catalog-list-heading"><div><h3 data-i18n="catalogCharacters">Personnages enregistrés</h3><p data-i18n="catalogPrivacy">Ce catalogue privé sert à composer tes paquets.</p></div><span class="catalog-count" id="catalog-count">0</span></div>
+                <div class="catalog-list" id="catalog-list"></div>
+                <div class="catalog-empty" id="catalog-empty"><span aria-hidden="true">✦</span><p data-i18n="emptyCatalog">Ton catalogue est vide. Ajoute quelques personnages pour lancer la collection.</p></div>
               </div>
-              <label class="search-box">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 4 4"/></svg>
-                <input id="search-input" type="search" placeholder="Rechercher…" aria-label="Rechercher une tâche" data-i18n-placeholder="search" data-i18n-aria="searchTask">
-                <kbd>⌘ K</kbd>
-              </label>
             </div>
-            <div class="task-list" id="task-list" aria-live="polite"></div>
-            <div class="empty-state" id="empty-state" hidden>
-              <div class="empty-illustration" aria-hidden="true"><span>✳</span><div class="empty-check">✓</div></div>
-              <h3 id="empty-title" data-i18n="emptyTitle">Tout commence par une idée.</h3>
-              <p id="empty-copy" data-i18n="emptyCopy">Ajoutez une première tâche et donnez-lui vie.</p>
-              <button class="empty-add" id="empty-add" type="button"><span data-i18n="createFirst">Créer ma première tâche</span> <span>→</span></button>
-            </div>
-            <div class="list-footer" id="list-footer"><span><i class="footer-dot"></i> <span data-i18n="atYourPace">À votre rythme, toujours.</span></span><span id="footer-count"></span></div>
           </section>
         </div>
-        <section class="content-wrap app-view feature-view" data-view-panel="mindmap" hidden>
-          <div class="section-heading feature-heading">
-            <div><span class="section-kicker" data-i18n="mindmapEyebrow">VOS IDÉES, CONNECTÉES</span><h2 data-i18n="mindmapTitle">Cartes mentales</h2></div>
-            <button class="add-button" id="new-mindmap" type="button" data-i18n="newMindmap">+ Nouvelle carte</button>
-          </div>
-          <div class="feature-toolbar">
-            <label class="feature-field"><span data-i18n="chooseMap">Carte</span><select class="form-input" id="mindmap-select"></select></label>
-            <button class="secondary-button" id="rename-mindmap" type="button" data-i18n="rename">Renommer</button>
-            <button class="secondary-button danger-button" id="delete-mindmap" type="button" data-i18n="deleteMap">Supprimer la carte</button>
-          </div>
-          <div class="mindmap-addbar">
-            <input class="form-input" id="mindmap-idea" maxlength="120" placeholder="Ajouter une idée principale…" data-i18n-placeholder="ideaPlaceholder">
-            <button class="add-button" id="add-mindmap-idea" type="button" data-i18n="addIdea">Ajouter une idée</button>
-          </div>
-          <div class="feature-canvas mindmap-canvas" id="mindmap-canvas" aria-live="polite"></div>
-        </section>
-        <section class="content-wrap app-view feature-view" data-view-panel="agenda" hidden>
-          <div class="section-heading feature-heading">
-            <div><span class="section-kicker" data-i18n="agendaEyebrow">VOTRE TEMPS, EN CLAIR</span><h2 data-i18n="agendaTitle">Agenda</h2></div>
-            <button class="add-button" id="new-event" type="button" data-i18n="newEvent">+ Nouvel événement</button>
-          </div>
-          <div class="feature-toolbar agenda-toolbar">
-            <label class="feature-field"><span data-i18n="fromDate">À partir du</span><input class="form-input" id="agenda-date" type="date"></label>
-            <button class="secondary-button" id="agenda-today" type="button" data-i18n="today">Aujourd’hui</button>
-          </div>
-          <div class="agenda-list" id="agenda-list" aria-live="polite"></div>
-        </section>
-        <section class="content-wrap app-view feature-view" data-view-panel="timetable" hidden>
-          <div class="section-heading feature-heading">
-            <div><span class="section-kicker" data-i18n="timetableEyebrow">UNE SEMAINE BIEN PENSÉE</span><h2 data-i18n="timetableTitle">Emploi du temps</h2></div>
-            <div class="feature-actions">
-              <button class="secondary-button" id="print-timetable" type="button" data-i18n="exportPdf">Exporter en PDF</button>
-              <button class="add-button" id="new-slot" type="button" data-i18n="newSlot">+ Ajouter un créneau</button>
-            </div>
-          </div>
-          <p class="feature-hint" data-i18n="pdfImportHint">Importe un PDF existant pour le consulter ici, ou crée un emploi du temps modifiable et exporte-le en PDF.</p>
-          <div class="pdf-import-card">
-            <label class="feature-field"><span data-i18n="importPdf">Importer un emploi du temps PDF</span><input class="form-input" id="pdf-upload" type="file" accept="application/pdf,.pdf"></label>
-            <div class="pdf-list" id="pdf-list"></div>
-          </div>
-          <div class="timetable-grid-wrap"><div class="timetable-grid" id="timetable-grid" aria-live="polite"></div></div>
-        </section>
-        <footer class="page-footer"><span><span data-i18n="madeWithCare">Conçu avec intention</span> <span class="footer-heart">♥</span></span><span data-i18n="footerBrand">CLAIR · ESPACE PERSONNEL</span></footer>
+        <footer class="site-footer"><span>CLAIR CARDS <span>✦</span></span><span data-i18n="footerCopy">Ta prochaine découverte n’est qu’à un paquet.</span></footer>
       </main>
     </div>
 
-    <dialog class="task-dialog" id="task-dialog" aria-labelledby="dialog-title">
-      <form id="task-form">
-        <div class="dialog-topline"><span class="dialog-eyebrow" data-i18n="stepEyebrow">UNE PETITE ÉTAPE DE PLUS</span><button class="dialog-close" id="close-form" type="button" aria-label="Fermer" data-i18n-aria="close">×</button></div>
-        <h2 id="dialog-title"><span data-i18n="newIntent">Une nouvelle</span><br><span data-i18n="intention">intention.</span></h2>
-        <label class="form-label" for="task-title" data-i18n="taskQuestion">Qu’aimeriez-vous accomplir ?</label>
-        <input class="form-input" id="task-title" name="title" maxlength="120" placeholder="Ex. Préparer ma semaine" data-i18n-placeholder="titlePlaceholder" required>
-        <label class="form-label" for="task-description"><span data-i18n="details">Quelques détails</span> <span data-i18n="optional">(facultatif)</span></label>
-        <textarea class="form-input form-textarea" id="task-description" name="description" maxlength="500" placeholder="Ajoutez une note pour vous…" data-i18n-placeholder="descriptionPlaceholder"></textarea>
-        <label class="form-label" for="task-priority" data-i18n="importance">Niveau d’importance</label>
-        <select class="form-input form-select" id="task-priority" name="priority">
-          <option value="basse" data-i18n="priorityLow">Faible — quand j’aurai le temps</option>
-          <option value="normale" selected data-i18n="priorityNormal">Normale — dans ma liste</option>
-          <option value="haute" data-i18n="priorityHigh">Élevée — priorité du moment</option>
-        </select>
-        <p class="form-error" id="form-error" role="alert" hidden></p>
-        <button class="submit-button" type="submit"><span data-i18n="addToList">Ajouter à ma liste</span><span>→</span></button>
-      </form>
-    </dialog>
-    <dialog class="task-dialog auth-dialog" id="auth-dialog" aria-labelledby="auth-title">
+    <dialog class="modal auth-modal" id="auth-dialog" aria-labelledby="auth-title">
       <form id="auth-form">
-        <div class="dialog-topline"><span class="dialog-eyebrow" data-i18n="account">COMPTE CLAIR</span><button class="dialog-close" id="close-auth" type="button" aria-label="Fermer" data-i18n-aria="close">×</button></div>
+        <div class="modal-topline"><span class="modal-mark" aria-hidden="true">✦</span><button class="modal-close" id="close-auth" type="button" aria-label="Fermer" data-i18n-aria="close">×</button></div>
+        <p class="eyebrow" data-i18n="account">COMPTE CLAIR</p>
         <h2 id="auth-title" data-i18n="signIn">Se connecter</h2>
+        <p class="auth-copy" data-i18n="authDescription">Connecte-toi pour ouvrir des paquets et garder ta collection.</p>
         <p class="auth-notice" id="auth-notice" role="status" aria-live="polite"></p>
         <div id="auth-controls">
-          <button class="google-button" id="google-sign-in" type="button"><span aria-hidden="true">G</span> <span data-i18n="continueGoogle">Continuer avec Google</span></button>
-          <div class="auth-divider"><span data-i18n="orEmail">ou avec votre e-mail</span></div>
-          <div id="username-field" hidden><label class="form-label" for="auth-username" data-i18n="username">Nom d’utilisateur</label>
-          <input class="form-input" id="auth-username" name="username" maxlength="40" autocomplete="nickname" placeholder="Votre nom" data-i18n-placeholder="usernamePlaceholder"></div>
+          <div class="oauth-buttons">
+            <button class="oauth-button google-button" id="google-sign-in" type="button"><span class="oauth-icon google-icon" aria-hidden="true">G</span><span data-i18n="continueGoogle">Continuer avec Google</span></button>
+            <button class="oauth-button discord-button" id="discord-sign-in" type="button"><span class="oauth-icon discord-icon" aria-hidden="true">◉</span><span data-i18n="continueDiscord">Continuer avec Discord</span></button>
+          </div>
+          <div class="auth-divider"><span data-i18n="orEmail">ou avec ton e-mail</span></div>
+          <div id="username-field" hidden><label class="form-label" for="auth-username" data-i18n="username">Nom d’utilisateur</label><input class="form-input" id="auth-username" maxlength="40" autocomplete="nickname" placeholder="Ton nom" data-i18n-placeholder="usernamePlaceholder"></div>
           <label class="form-label" for="auth-email" data-i18n="email">Adresse e-mail</label>
-          <input class="form-input" id="auth-email" name="email" type="email" autocomplete="email" placeholder="vous@exemple.com" required data-i18n-placeholder="emailPlaceholder">
+          <input class="form-input" id="auth-email" type="email" autocomplete="email" placeholder="toi@exemple.com" data-i18n-placeholder="emailPlaceholder" required>
           <label class="form-label" for="auth-password" data-i18n="password">Mot de passe</label>
-          <input class="form-input" id="auth-password" name="password" type="password" minlength="8" autocomplete="current-password" placeholder="8 caractères minimum" required data-i18n-placeholder="passwordPlaceholder">
-          <button class="submit-button" id="auth-submit" type="submit" data-i18n="signIn">Se connecter</button>
-          <button class="auth-switch" id="auth-switch" type="button"><span data-i18n="noAccount">Pas encore de compte ?</span> <span data-i18n="createAccount">Créer un compte</span></button>
+          <input class="form-input" id="auth-password" type="password" minlength="8" autocomplete="current-password" placeholder="8 caractères minimum" data-i18n-placeholder="passwordPlaceholder" required>
+          <button class="primary-button auth-submit" id="auth-submit" type="submit" data-i18n="signIn">Se connecter</button>
+          <button class="auth-switch" id="auth-switch" type="button"><span data-i18n="noAccount">Pas encore de compte ?</span> <strong data-i18n="createAccount">Créer un compte</strong></button>
         </div>
-        <div id="signed-in-controls" hidden><button class="submit-button import-button" id="import-local" type="button" data-i18n="importLocal" hidden>Importer les tâches de cet appareil</button><button class="submit-button sign-out-button" id="sign-out" type="button" data-i18n="signOut">Se déconnecter</button></div>
+        <div id="signed-in-controls" hidden><p class="auth-user" id="auth-user"></p><button class="secondary-button sign-out-button" id="sign-out" type="button" data-i18n="signOut">Se déconnecter</button></div>
       </form>
     </dialog>
-    <dialog class="task-dialog feature-dialog" id="event-dialog" aria-labelledby="event-dialog-title">
-      <form id="event-form">
-        <div class="dialog-topline"><span class="dialog-eyebrow" data-i18n="agendaView">Agenda</span><button class="dialog-close" id="close-event" type="button" aria-label="Fermer" data-i18n-aria="close">×</button></div>
-        <h2 id="event-dialog-title" data-i18n="newEvent">Nouvel événement</h2>
-        <label class="form-label" for="event-title" data-i18n="eventName">Nom de l’événement</label><input class="form-input" id="event-title" maxlength="120" required>
-        <label class="form-label" for="event-date" data-i18n="date">Date</label><input class="form-input" id="event-date" type="date" required>
-        <div class="time-fields"><label class="form-label" for="event-start" data-i18n="startTime">Début</label><input class="form-input" id="event-start" type="time" required><label class="form-label" for="event-end" data-i18n="endTime">Fin</label><input class="form-input" id="event-end" type="time" required></div>
-        <label class="form-label" for="event-notes" data-i18n="notes">Notes (facultatif)</label><textarea class="form-input form-textarea" id="event-notes" maxlength="500"></textarea>
-        <p class="form-error" id="event-error" role="alert" hidden></p>
-        <button class="submit-button" type="submit" data-i18n="saveEvent">Enregistrer l’événement</button>
-      </form>
-    </dialog>
-    <dialog class="task-dialog feature-dialog" id="text-dialog" aria-labelledby="text-dialog-title">
-      <form id="text-form">
-        <div class="dialog-topline"><span class="dialog-eyebrow" data-i18n="mindmapView">Cartes mentales</span><button class="dialog-close" id="close-text" type="button" aria-label="Fermer" data-i18n-aria="close">×</button></div>
-        <h2 id="text-dialog-title"></h2>
-        <label class="form-label" id="text-label" for="text-value"></label>
-        <input class="form-input" id="text-value" maxlength="120" required>
-        <p class="form-error" id="text-error" role="alert" hidden></p>
-        <button class="submit-button" type="submit" data-i18n="save">Enregistrer</button>
-      </form>
-    </dialog>
-    <dialog class="task-dialog feature-dialog" id="slot-dialog" aria-labelledby="slot-dialog-title">
-      <form id="slot-form">
-        <div class="dialog-topline"><span class="dialog-eyebrow" data-i18n="timetableView">Emploi du temps</span><button class="dialog-close" id="close-slot" type="button" aria-label="Fermer" data-i18n-aria="close">×</button></div>
-        <h2 id="slot-dialog-title" data-i18n="newSlot">Ajouter un créneau</h2>
-        <label class="form-label" for="slot-title" data-i18n="slotName">Cours ou activité</label><input class="form-input" id="slot-title" maxlength="120" required>
-        <label class="form-label" for="slot-day" data-i18n="day">Jour</label><select class="form-input" id="slot-day"></select>
-        <div class="time-fields"><label class="form-label" for="slot-start" data-i18n="startTime">Début</label><input class="form-input" id="slot-start" type="time" required><label class="form-label" for="slot-end" data-i18n="endTime">Fin</label><input class="form-input" id="slot-end" type="time" required></div>
-        <label class="form-label" for="slot-location" data-i18n="location">Lieu (facultatif)</label><input class="form-input" id="slot-location" maxlength="120">
-        <p class="form-error" id="slot-error" role="alert" hidden></p>
-        <button class="submit-button" type="submit" data-i18n="saveSlot">Enregistrer le créneau</button>
-      </form>
+    <dialog class="modal reveal-modal" id="reveal-dialog" aria-labelledby="reveal-title">
+      <div class="reveal-content">
+        <div class="modal-topline"><span class="eyebrow" data-i18n="packOpened">NOUVEAU PAQUET</span><button class="modal-close" id="close-reveal" type="button" aria-label="Fermer" data-i18n-aria="close">×</button></div>
+        <h2 id="reveal-title" data-i18n="revealTitle">Tes nouvelles cartes.</h2>
+        <p class="reveal-subtitle" id="reveal-subtitle"></p>
+        <div class="card-grid reveal-grid" id="reveal-grid"></div>
+        <button class="primary-button reveal-done" id="reveal-done" type="button" data-i18n="backToCollection">Retour à ma collection</button>
+      </div>
     </dialog>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
   </body>
