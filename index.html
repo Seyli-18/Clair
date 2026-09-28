@@ -9,11 +9,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&family=Noto+Sans+Arabic:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=3">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-config.js" defer></script>
-    <script src="translations.js" defer></script>
-    <script src="app.js" defer></script>
+    <script src="translations.js?v=2" defer></script>
+    <script src="app.js?v=3" defer></script>
   </head>
   <body>
     <div class="app-shell">
@@ -66,8 +66,14 @@
             </button>
           </div>
         </header>
+        <nav class="feature-nav" aria-label="Outils Clair" data-i18n-aria="featureNav">
+          <button class="feature-tab selected" type="button" data-view="tasks" data-i18n="tasksView">Tâches</button>
+          <button class="feature-tab" type="button" data-view="mindmap" data-i18n="mindmapView">Cartes mentales</button>
+          <button class="feature-tab" type="button" data-view="agenda" data-i18n="agendaView">Agenda</button>
+          <button class="feature-tab" type="button" data-view="timetable" data-i18n="timetableView">Emploi du temps</button>
+        </nav>
 
-        <div class="content-wrap">
+        <div class="content-wrap app-view" data-view-panel="tasks">
           <section class="welcome-section">
             <div>
               <div class="eyebrow"><span class="eyebrow-line"></span> <span data-i18n="eyebrow">VOTRE ESPACE, EN MIEUX</span></div>
@@ -126,6 +132,48 @@
             <div class="list-footer" id="list-footer"><span><i class="footer-dot"></i> <span data-i18n="atYourPace">À votre rythme, toujours.</span></span><span id="footer-count"></span></div>
           </section>
         </div>
+        <section class="content-wrap app-view feature-view" data-view-panel="mindmap" hidden>
+          <div class="section-heading feature-heading">
+            <div><span class="section-kicker" data-i18n="mindmapEyebrow">VOS IDÉES, CONNECTÉES</span><h2 data-i18n="mindmapTitle">Cartes mentales</h2></div>
+            <button class="add-button" id="new-mindmap" type="button" data-i18n="newMindmap">+ Nouvelle carte</button>
+          </div>
+          <div class="feature-toolbar">
+            <label class="feature-field"><span data-i18n="chooseMap">Carte</span><select class="form-input" id="mindmap-select"></select></label>
+            <button class="secondary-button" id="rename-mindmap" type="button" data-i18n="rename">Renommer</button>
+            <button class="secondary-button danger-button" id="delete-mindmap" type="button" data-i18n="deleteMap">Supprimer la carte</button>
+          </div>
+          <div class="mindmap-addbar">
+            <input class="form-input" id="mindmap-idea" maxlength="120" placeholder="Ajouter une idée principale…" data-i18n-placeholder="ideaPlaceholder">
+            <button class="add-button" id="add-mindmap-idea" type="button" data-i18n="addIdea">Ajouter une idée</button>
+          </div>
+          <div class="feature-canvas mindmap-canvas" id="mindmap-canvas" aria-live="polite"></div>
+        </section>
+        <section class="content-wrap app-view feature-view" data-view-panel="agenda" hidden>
+          <div class="section-heading feature-heading">
+            <div><span class="section-kicker" data-i18n="agendaEyebrow">VOTRE TEMPS, EN CLAIR</span><h2 data-i18n="agendaTitle">Agenda</h2></div>
+            <button class="add-button" id="new-event" type="button" data-i18n="newEvent">+ Nouvel événement</button>
+          </div>
+          <div class="feature-toolbar agenda-toolbar">
+            <label class="feature-field"><span data-i18n="fromDate">À partir du</span><input class="form-input" id="agenda-date" type="date"></label>
+            <button class="secondary-button" id="agenda-today" type="button" data-i18n="today">Aujourd’hui</button>
+          </div>
+          <div class="agenda-list" id="agenda-list" aria-live="polite"></div>
+        </section>
+        <section class="content-wrap app-view feature-view" data-view-panel="timetable" hidden>
+          <div class="section-heading feature-heading">
+            <div><span class="section-kicker" data-i18n="timetableEyebrow">UNE SEMAINE BIEN PENSÉE</span><h2 data-i18n="timetableTitle">Emploi du temps</h2></div>
+            <div class="feature-actions">
+              <button class="secondary-button" id="print-timetable" type="button" data-i18n="exportPdf">Exporter en PDF</button>
+              <button class="add-button" id="new-slot" type="button" data-i18n="newSlot">+ Ajouter un créneau</button>
+            </div>
+          </div>
+          <p class="feature-hint" data-i18n="pdfImportHint">Importe un PDF existant pour le consulter ici, ou crée un emploi du temps modifiable et exporte-le en PDF.</p>
+          <div class="pdf-import-card">
+            <label class="feature-field"><span data-i18n="importPdf">Importer un emploi du temps PDF</span><input class="form-input" id="pdf-upload" type="file" accept="application/pdf,.pdf"></label>
+            <div class="pdf-list" id="pdf-list"></div>
+          </div>
+          <div class="timetable-grid-wrap"><div class="timetable-grid" id="timetable-grid" aria-live="polite"></div></div>
+        </section>
         <footer class="page-footer"><span><span data-i18n="madeWithCare">Conçu avec intention</span> <span class="footer-heart">♥</span></span><span data-i18n="footerBrand">CLAIR · ESPACE PERSONNEL</span></footer>
       </main>
     </div>
@@ -157,15 +205,49 @@
           <button class="google-button" id="google-sign-in" type="button"><span aria-hidden="true">G</span> <span data-i18n="continueGoogle">Continuer avec Google</span></button>
           <div class="auth-divider"><span data-i18n="orEmail">ou avec votre e-mail</span></div>
           <div id="username-field" hidden><label class="form-label" for="auth-username" data-i18n="username">Nom d’utilisateur</label>
-          <input class="form-input" id="auth-username" name="username" maxlength="40" autocomplete="nickname" data-i18n-placeholder="usernamePlaceholder"></div>
+          <input class="form-input" id="auth-username" name="username" maxlength="40" autocomplete="nickname" placeholder="Votre nom" data-i18n-placeholder="usernamePlaceholder"></div>
           <label class="form-label" for="auth-email" data-i18n="email">Adresse e-mail</label>
-          <input class="form-input" id="auth-email" name="email" type="email" autocomplete="email" required data-i18n-placeholder="emailPlaceholder">
+          <input class="form-input" id="auth-email" name="email" type="email" autocomplete="email" placeholder="vous@exemple.com" required data-i18n-placeholder="emailPlaceholder">
           <label class="form-label" for="auth-password" data-i18n="password">Mot de passe</label>
-          <input class="form-input" id="auth-password" name="password" type="password" minlength="8" autocomplete="current-password" required data-i18n-placeholder="passwordPlaceholder">
+          <input class="form-input" id="auth-password" name="password" type="password" minlength="8" autocomplete="current-password" placeholder="8 caractères minimum" required data-i18n-placeholder="passwordPlaceholder">
           <button class="submit-button" id="auth-submit" type="submit" data-i18n="signIn">Se connecter</button>
           <button class="auth-switch" id="auth-switch" type="button"><span data-i18n="noAccount">Pas encore de compte ?</span> <span data-i18n="createAccount">Créer un compte</span></button>
         </div>
         <div id="signed-in-controls" hidden><button class="submit-button import-button" id="import-local" type="button" data-i18n="importLocal" hidden>Importer les tâches de cet appareil</button><button class="submit-button sign-out-button" id="sign-out" type="button" data-i18n="signOut">Se déconnecter</button></div>
+      </form>
+    </dialog>
+    <dialog class="task-dialog feature-dialog" id="event-dialog" aria-labelledby="event-dialog-title">
+      <form id="event-form">
+        <div class="dialog-topline"><span class="dialog-eyebrow" data-i18n="agendaView">Agenda</span><button class="dialog-close" id="close-event" type="button" aria-label="Fermer" data-i18n-aria="close">×</button></div>
+        <h2 id="event-dialog-title" data-i18n="newEvent">Nouvel événement</h2>
+        <label class="form-label" for="event-title" data-i18n="eventName">Nom de l’événement</label><input class="form-input" id="event-title" maxlength="120" required>
+        <label class="form-label" for="event-date" data-i18n="date">Date</label><input class="form-input" id="event-date" type="date" required>
+        <div class="time-fields"><label class="form-label" for="event-start" data-i18n="startTime">Début</label><input class="form-input" id="event-start" type="time" required><label class="form-label" for="event-end" data-i18n="endTime">Fin</label><input class="form-input" id="event-end" type="time" required></div>
+        <label class="form-label" for="event-notes" data-i18n="notes">Notes (facultatif)</label><textarea class="form-input form-textarea" id="event-notes" maxlength="500"></textarea>
+        <p class="form-error" id="event-error" role="alert" hidden></p>
+        <button class="submit-button" type="submit" data-i18n="saveEvent">Enregistrer l’événement</button>
+      </form>
+    </dialog>
+    <dialog class="task-dialog feature-dialog" id="text-dialog" aria-labelledby="text-dialog-title">
+      <form id="text-form">
+        <div class="dialog-topline"><span class="dialog-eyebrow" data-i18n="mindmapView">Cartes mentales</span><button class="dialog-close" id="close-text" type="button" aria-label="Fermer" data-i18n-aria="close">×</button></div>
+        <h2 id="text-dialog-title"></h2>
+        <label class="form-label" id="text-label" for="text-value"></label>
+        <input class="form-input" id="text-value" maxlength="120" required>
+        <p class="form-error" id="text-error" role="alert" hidden></p>
+        <button class="submit-button" type="submit" data-i18n="save">Enregistrer</button>
+      </form>
+    </dialog>
+    <dialog class="task-dialog feature-dialog" id="slot-dialog" aria-labelledby="slot-dialog-title">
+      <form id="slot-form">
+        <div class="dialog-topline"><span class="dialog-eyebrow" data-i18n="timetableView">Emploi du temps</span><button class="dialog-close" id="close-slot" type="button" aria-label="Fermer" data-i18n-aria="close">×</button></div>
+        <h2 id="slot-dialog-title" data-i18n="newSlot">Ajouter un créneau</h2>
+        <label class="form-label" for="slot-title" data-i18n="slotName">Cours ou activité</label><input class="form-input" id="slot-title" maxlength="120" required>
+        <label class="form-label" for="slot-day" data-i18n="day">Jour</label><select class="form-input" id="slot-day"></select>
+        <div class="time-fields"><label class="form-label" for="slot-start" data-i18n="startTime">Début</label><input class="form-input" id="slot-start" type="time" required><label class="form-label" for="slot-end" data-i18n="endTime">Fin</label><input class="form-input" id="slot-end" type="time" required></div>
+        <label class="form-label" for="slot-location" data-i18n="location">Lieu (facultatif)</label><input class="form-input" id="slot-location" maxlength="120">
+        <p class="form-error" id="slot-error" role="alert" hidden></p>
+        <button class="submit-button" type="submit" data-i18n="saveSlot">Enregistrer le créneau</button>
       </form>
     </dialog>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
